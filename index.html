@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的全方位運動紀錄</title>
+    <!-- Tailwind CSS (樣式庫) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome (圖示) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .loading-spinner { border-top-color: #3b82f6; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* 隱藏滾動條但保持功能 */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- 導航列 -->
+    <nav class="bg-white shadow-md fixed w-full z-10 top-0">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-person-running text-blue-600 text-2xl"></i>
+                    <h1 class="text-xl font-bold tracking-tight text-gray-900">運動儀表板</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="使用說明">
+                        <i class="fa-solid fa-circle-info text-xl"></i>
+                    </button>
+                    <button onclick="openSettings()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="設定">
+                        <i class="fa-solid fa-gear text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要內容區 -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+
+        <!-- 狀態與載入提示 -->
+        <div id="statusMsg" class="hidden mb-4 p-4 rounded-md text-sm font-medium"></div>
+
+        <!-- 統計卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white card-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-blue-100 text-sm font-medium mb-1">總運動次數</p>
+                        <h3 class="text-3xl font-bold" id="totalCount">0</h3>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                        <i class="fa-solid fa-hashtag text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white card-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-emerald-100 text-sm font-medium mb-1">累積總距離</p>
+                        <h3 class="text-3xl font-bold"><span id="totalDistance">0.0</span> <span class="text-lg font-normal">km</span></h3>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                        <i class="fa-solid fa-route text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white card-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-orange-100 text-sm font-medium mb-1">總消耗熱量</p>
+                        <h3 class="text-3xl font-bold"><span id="totalCalories">0</span> <span class="text-lg font-normal">kcal</span></h3>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                        <i class="fa-solid fa-fire text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 類型切換 Tabs -->
+        <div class="flex space-x-2 mb-6 bg-gray-200 p-1 rounded-lg w-fit">
+            <button onclick="switchTab('running')" id="tab-running" class="px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-blue-600">
+                <i class="fa-solid fa-person-running mr-2"></i>跑步紀錄
+            </button>
+            <button onclick="switchTab('cycling')" id="tab-cycling" class="px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900">
+                <i class="fa-solid fa-bicycle mr-2"></i>腳踏車紀錄
+            </button>
+        </div>
+
+        <!-- 資料列表 -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期/時間</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持續時間</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">距離 (km)</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">熱量 (kcal)</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">均速 (km/h)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- 資料將由 JS 插入 -->
+                        <tr>
+                            <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                                請先點擊右上角「設定」按鈕，設定您的 GAS URL 與試算表 ID。
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- 載入動畫 -->
+            <div id="loadingIndicator" class="hidden flex justify-center items-center py-10">
+                <div class="loading-spinner ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8"></div>
+                <span class="ml-3 text-gray-500 font-medium">資料讀取中...</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- 設定 Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm"></div>
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <i class="fa-solid fa-gear text-blue-600"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">系統設定</h3>
+                                <div class="mt-4 space-y-4">
+                                    <!-- GAS URL -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">GAS 部署網址 (Web App URL)</label>
+                                        <input type="password" id="settingGasUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="https://script.google.com/macros/s/...">
+                                    </div>
+                                    <hr class="border-gray-200">
+                                    <!-- Running Settings -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-blue-700"><i class="fa-solid fa-person-running mr-1"></i>跑步試算表 ID</label>
+                                        <input type="text" id="settingRunId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 sm:text-sm p-2 border" placeholder="輸入跑步紀錄的 Spreadsheet ID">
+                                        <label class="block text-xs text-gray-500 mt-1">工作表名稱 (預設: 運動紀錄 )</label>
+                                        <input type="text" id="settingRunSheetName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-xs p-2 border bg-gray-50" value="運動紀錄 ">
+                                    </div>
+                                    <!-- Cycling Settings -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-emerald-700"><i class="fa-solid fa-bicycle mr-1"></i>腳踏車試算表 ID</label>
+                                        <input type="text" id="settingBikeId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 sm:text-sm p-2 border" placeholder="輸入腳踏車紀錄的 Spreadsheet ID">
+                                        <label class="block text-xs text-gray-500 mt-1">工作表名稱 (預設: 騎乘紀錄 )</label>
+                                        <input type="text" id="settingBikeSheetName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-xs p-2 border bg-gray-50" value="騎乘紀錄  ">
+                                    </div>
+                                    <!-- Gemini API (Optional) -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-purple-700">Gemini API Key (選填)</label>
+                                        <input type="password" id="settingApiKey" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 sm:text-sm p-2 border" placeholder="若無可留空">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 justify-between">
+                        <div class="flex sm:flex-row-reverse gap-2">
+                            <button type="button" onclick="saveSettings()" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto">儲存並重整</button>
+                            <button type="button" onclick="closeSettings()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">取消</button>
+                        </div>
+                        <button type="button" onclick="resetSettings()" class="mt-3 sm:mt-0 inline-flex w-full justify-center rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 sm:w-auto border border-red-200">清除設定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 說明 Modal -->
+    <div id="helpModal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm" onclick="closeHelp()"></div>
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">GAS 部署與使用說明</h2>
+                    <button onclick="closeHelp()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa-solid fa-xmark text-2xl"></i>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto flex-1 text-sm text-gray-600 space-y-4">
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <h3 class="font-bold text-blue-800 mb-2">步驟 1: 建立 Google Apps Script</h3>
+                        <p>請前往 <a href="https://script.google.com/" target="_blank" class="text-blue-600 underline">script.google.com</a> 建立新專案，並將下方代碼完全覆蓋 `Code.gs`。</p>
+                    </div>
+                    
+                    <div class="relative group">
+                        <textarea id="gasCodeDisplay" class="w-full h-64 p-4 bg-gray-800 text-gray-100 rounded-lg font-mono text-xs" readonly></textarea>
+                        <button onclick="copyCode()" class="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs transition">
+                            <i class="fa-regular fa-copy mr-1"></i>複製代碼
+                        </button>
+                    </div>
+
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <h3 class="font-bold text-yellow-800 mb-2">步驟 2: 部署為網頁應用程式</h3>
+                        <ol class="list-decimal list-inside space-y-1 ml-2">
+                            <li>點擊右上角「部署」 > 「新增部署」。</li>
+                            <li>選取類型：「網頁應用程式」。</li>
+                            <li>執行身分：選取 <strong>「我 (Me)」</strong> (這樣才能讀取您的試算表)。</li>
+                            <li>誰可以存取：選取 <strong>「任何人 (Anyone)」</strong> (這樣前端 HTML 才能呼叫 API)。</li>
+                            <li>複製產生的網址 (URL)，並填入本系統的設定中。</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === 全域變數與初始化 ===
+        const LS_KEY = 'mySportTracker_config';
+        let currentMode = 'running'; // 'running' or 'cycling'
+        let config = {
+            gasUrl: '',
+            runId: '',
+            runSheet: '運動紀錄 ',
+            bikeId: '',
+            bikeSheet: '騎乘紀錄  ', // 注意使用者原始需求中的空格
+            apiKey: ''
+        };
+
+        // 頁面載入時執行
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            
+            // 填入程式碼到說明視窗 (這裡僅為示範，實際部署時請將 Code.gs 內容貼入)
+            // 在實際生成的文件中，這裡我們會放入一個指引字串
+            document.getElementById('gasCodeDisplay').value = "// 請複製上方的 Code.gs 內容至此";
+
+            // 如果有設定，自動讀取
+            if (config.gasUrl) {
+                fetchData();
+            } else {
+                openSettings(); // 第一次使用強制開啟設定
+            }
+        });
+
+        // === 設定管理 ===
+        function loadSettings() {
+            const saved = localStorage.getItem(LS_KEY);
+            if (saved) {
+                config = JSON.parse(saved);
+                // 填回 Input
+                document.getElementById('settingGasUrl').value = config.gasUrl || '';
+                document.getElementById('settingRunId').value = config.runId || '';
+                document.getElementById('settingRunSheetName').value = config.runSheet || '運動紀錄 ';
+                document.getElementById('settingBikeId').value = config.bikeId || '';
+                document.getElementById('settingBikeSheetName').value = config.bikeSheet || '騎乘紀錄  ';
+                document.getElementById('settingApiKey').value = config.apiKey || '';
+            }
+        }
+
+        function saveSettings() {
+            config.gasUrl = document.getElementById('settingGasUrl').value.trim();
+            config.runId = document.getElementById('settingRunId').value.trim();
+            config.runSheet = document.getElementById('settingRunSheetName').value; // 保留空格
+            config.bikeId = document.getElementById('settingBikeId').value.trim();
+            config.bikeSheet = document.getElementById('settingBikeSheetName').value; // 保留空格
+            config.apiKey = document.getElementById('settingApiKey').value.trim();
+
+            if (!config.gasUrl) {
+                alert('請輸入 GAS URL');
+                return;
+            }
+
+            localStorage.setItem(LS_KEY, JSON.stringify(config));
+            closeSettings();
+            fetchData(); // 重新讀取
+        }
+
+        function resetSettings() {
+            if(confirm('確定要清除所有設定嗎？')) {
+                localStorage.removeItem(LS_KEY);
+                location.reload();
+            }
+        }
+
+        // === 資料讀取與顯示 ===
+        function switchTab(mode) {
+            currentMode = mode;
+            
+            // UI 切換
+            const btnRun = document.getElementById('tab-running');
+            const btnBike = document.getElementById('tab-cycling');
+            
+            if (mode === 'running') {
+                btnRun.className = "px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-blue-600";
+                btnBike.className = "px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900";
+            } else {
+                btnBike.className = "px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-emerald-600";
+                btnRun.className = "px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900";
+            }
+
+            fetchData();
+        }
+
+        async function fetchData() {
+            const loading = document.getElementById('loadingIndicator');
+            const tbody = document.getElementById('dataTableBody');
+            const statusDiv = document.getElementById('statusMsg');
+            
+            // 清空表格與狀態
+            tbody.innerHTML = '';
+            statusDiv.className = 'hidden';
+            loading.classList.remove('hidden');
+
+            // 準備參數
+            const targetId = currentMode === 'running' ? config.runId : config.bikeId;
+            const targetSheet = currentMode === 'running' ? config.runSheet : config.bikeSheet;
+
+            if (!config.gasUrl || !targetId) {
+                loading.classList.add('hidden');
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-red-500">缺少試算表 ID 或 GAS URL 設定。</td></tr>`;
+                return;
+            }
+
+            const url = `${config.gasUrl}?action=read&spreadsheetId=${targetId}&sheetName=${encodeURIComponent(targetSheet)}&type=${currentMode}`;
+
+            try {
+                const response = await fetch(url);
+                const json = await response.json();
+
+                loading.classList.add('hidden');
+
+                if (json.status !== 'success') {
+                    throw new Error(json.message || '未知錯誤');
+                }
+
+                renderTable(json.data);
+                calculateStats(json.data);
+
+            } catch (error) {
+                loading.classList.add('hidden');
+                console.error(error);
+                statusDiv.innerText = `讀取失敗: ${error.message}`;
+                statusDiv.className = 'mb-4 p-4 rounded-md text-sm font-medium bg-red-100 text-red-700 block';
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">無法載入資料，請檢查設定與權限。</td></tr>`;
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('dataTableBody');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">目前尚無資料</td></tr>`;
+                return;
+            }
+
+            // 反轉陣列，讓最新資料顯示在最上面
+            [...data].reverse().forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">${row.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${row.duration}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">${row.distance}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-mono">${row.calories}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-mono">${row.speed}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 truncate max-w-xs" title="${row.notes}">${row.notes}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function calculateStats(data) {
+            let totalDist = 0;
+            let totalCal = 0;
+
+            data.forEach(row => {
+                totalDist += parseFloat(row.distance) || 0;
+                totalCal += parseFloat(row.calories) || 0;
+            });
+
+            // 動畫數字效果
+            animateValue("totalCount", 0, data.length, 1000);
+            animateValue("totalDistance", 0, totalDist.toFixed(1), 1000, true);
+            animateValue("totalCalories", 0, Math.floor(totalCal), 1000);
+        }
+
+        // === 工具函數 ===
+        function animateValue(id, start, end, duration, isFloat = false) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const val = progress * (end - start) + start;
+                obj.innerHTML = isFloat ? val.toFixed(1) : Math.floor(val);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); }
+        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+        function openHelp() { document.getElementById('helpModal').classList.remove('hidden'); }
+        function closeHelp() { document.getElementById('helpModal').classList.add('hidden'); }
+        
+        function copyCode() {
+            const code = document.getElementById('gasCodeDisplay');
+            code.select();
+            document.execCommand('copy');
+            alert('代碼已複製！');
+        }
+    </script>
+</body>
+</html>
