@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js (圖表庫) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QRCode.js (QR碼生成庫) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
@@ -51,8 +53,12 @@
                     <h1 class="text-xl font-bold tracking-tight text-gray-900 hidden sm:block">運動儀表板</h1>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-4">
-                    <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="使用說明">
-                        <i class="fa-solid fa-circle-info text-xl"></i>
+                    <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition flex items-center gap-2" title="使用說明">
+                        <i class="fa-solid fa-circle-info text-xl"></i> <span class="hidden sm:inline text-sm font-medium"></span>
+                    </button>
+                    <!-- 新增分享按鈕 -->
+                    <button onclick="openShare()" class="p-2 text-gray-500 hover:text-blue-600 transition flex items-center gap-2" title="分享設定">
+                        <i class="fa-solid fa-share-nodes text-xl"></i> <span class="hidden sm:inline text-sm font-medium"></span>
                     </button>
                     <button onclick="openSettings()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="設定">
                         <i class="fa-solid fa-gear text-xl"></i>
@@ -263,8 +269,8 @@
                         <div class="space-y-4">
                             <!-- GAS URL -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">GAS 部署網址</label>
-                                <input type="password" id="settingGasUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 sm:text-sm p-2 border">
+                                <label class="block text-sm font-medium text-gray-700">GAS 部署網址 (Web App URL)</label>
+                                <input type="password" id="settingGasUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 sm:text-sm p-2 border" placeholder="https://script.google.com/macros/s/...">
                             </div>
                             <!-- Running Settings -->
                             <div class="bg-blue-50 p-3 rounded-md">
@@ -290,15 +296,138 @@
             </div>
         </div>
     </div>
+    
+    <!-- 分享 Modal (New!) -->
+    <div id="shareModal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm" onclick="closeShare()"></div>
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center">
+                <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:w-full sm:max-w-md w-full">
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start justify-center">
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg font-semibold leading-6 text-gray-900 text-center mb-4"><i class="fa-solid fa-qrcode text-blue-600 mr-2"></i>分享設定 & QR Code</h3>
+                                
+                                <p class="text-sm text-gray-500 mb-4 text-center">掃描此 QR Code 或複製連結，即可在手機上直接使用目前的設定。</p>
+                                
+                                <div class="flex justify-center mb-4 p-4 bg-white border rounded-lg">
+                                    <div id="qrcode"></div>
+                                </div>
+                                
+                                <div class="mt-2">
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">分享連結</label>
+                                    <div class="flex rounded-md shadow-sm">
+                                        <input type="text" id="shareLinkInput" class="block w-full rounded-l-md border-gray-300 text-xs p-2 border bg-gray-50 text-gray-500" readonly>
+                                        <button type="button" onclick="copyShareLink()" class="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button" onclick="closeShare()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">關閉</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- 說明 Modal -->
+    <!-- 說明 Modal (詳細版) -->
     <div id="helpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="fixed inset-0 bg-gray-900 bg-opacity-80" onclick="closeHelp()"></div>
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative z-10">
-            <h2 class="text-xl font-bold mb-4">使用說明</h2>
-            <p class="text-sm text-gray-600 mb-4">本系統整合了您的「跑步」與「腳踏車」試算表。月曆功能點選日期可查看當日明細。綜合趨勢圖現已同時顯示距離(長條)與熱量(折線)。</p>
-            <div class="flex justify-end">
-                <button onclick="closeHelp()" class="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">關閉</button>
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm" onclick="closeHelp()"></div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative z-10">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open-reader text-blue-600"></i> 使用與部署指南
+                </h2>
+                <button onclick="closeHelp()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+            
+            <!-- Body (Scrollable) -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-8">
+                
+                <!-- Section 1: Spreadsheet Format -->
+                <section>
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-l-4 border-blue-500 pl-3">1. 試算表格式規範</h3>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800 mb-4">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> 請確保您的 Google 試算表第一列（標頭）與下方名稱<strong>完全一致</strong>（包含空格）。
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="border rounded-lg overflow-hidden">
+                            <div class="bg-blue-100 px-4 py-2 font-bold text-blue-800 border-b border-blue-200">
+                                <i class="fa-solid fa-person-running mr-1"></i> 跑步紀錄表
+                            </div>
+                            <div class="p-4 bg-white text-sm space-y-1 font-mono text-gray-600">
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">A</span> 紀錄時間</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">B</span> 運動時間</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">C</span>  距離(km)</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">D</span>  消耗熱量(kcal)</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">E</span>  平均速度(km/h)</div>
+                                <div class="flex py-1"><span class="w-6 text-gray-400">F</span>  備註</div>
+                            </div>
+                        </div>
+                        <div class="border rounded-lg overflow-hidden">
+                            <div class="bg-emerald-100 px-4 py-2 font-bold text-emerald-800 border-b border-emerald-200">
+                                <i class="fa-solid fa-bicycle mr-1"></i> 騎乘紀錄表
+                            </div>
+                            <div class="p-4 bg-white text-sm space-y-1 font-mono text-gray-600">
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">A</span>  日期時間</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">B</span>  騎乘時長</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">C</span>  總距離 (km)</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">D</span>  消耗熱量 (kcal)</div>
+                                <div class="flex border-b border-gray-100 py-1"><span class="w-6 text-gray-400">E</span>  平均速度 (km/h)</div>
+                                <div class="flex py-1"><span class="w-6 text-gray-400">F</span>  備註</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 2: Installation -->
+                <section>
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 border-l-4 border-blue-500 pl-3">2. 部署教學步驟</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-gray-700 text-sm">
+                        <li>前往 <a href="https://script.google.com/" target="_blank" class="text-blue-600 underline font-bold hover:text-blue-800">Google Apps Script</a> 建立一個「新專案」。</li>
+                        <li>將下方提供的程式碼完全複製，並覆蓋編輯器中的內容（預設的 <code>myFunction</code>）。</li>
+                        <li>點擊右上角的 <strong>「部署」 (Deploy)</strong> &gt; <strong>「新增部署」 (New deployment)</strong>。</li>
+                        <li>點擊左側齒輪圖示，選擇類型為 <strong>「網頁應用程式」 (Web app)</strong>。</li>
+                        <li>設定如下（<strong>非常重要！</strong>）：
+                            <ul class="list-disc list-inside ml-5 mt-1 text-gray-600">
+                                <li><strong>說明</strong>：任意填寫 (如：運動API)。</li>
+                                <li><strong>執行身分 (Execute as)</strong>：選擇 <strong>「我」 (Me)</strong>。</li>
+                                <li><strong>誰可以存取 (Who has access)</strong>：選擇 <strong>「任何人」 (Anyone)</strong>。</li>
+                            </ul>
+                        </li>
+                        <li>點擊「部署」，授權存取您的試算表，最後複製產生的 <strong>網頁應用程式網址 (Web App URL)</strong>。</li>
+                        <li>回到本網頁，點擊右上角「設定」，貼上 URL 與兩個試算表的 ID。</li>
+                    </ol>
+                </section>
+
+                <!-- Section 3: GAS Code -->
+                <section>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-gray-800 border-l-4 border-blue-500 pl-3">3. 後端程式碼 (Code.gs)</h3>
+                        <button onclick="copyGasCode()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-2 transition shadow-sm">
+                            <i class="fa-regular fa-copy"></i> 複製代碼
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <textarea id="gasCodeSource" class="w-full h-64 p-4 bg-gray-800 text-gray-100 rounded-lg font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500" readonly></textarea>
+                        <div class="absolute top-0 right-0 p-2 text-gray-500 text-xs italic">Read-only</div>
+                    </div>
+                </section>
+
+            </div>
+            
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end rounded-b-xl">
+                <button onclick="closeHelp()" class="bg-white border border-gray-300 text-gray-700 px-5 py-2 rounded-md hover:bg-gray-100 transition shadow-sm font-medium text-sm">
+                    關閉
+                </button>
             </div>
         </div>
     </div>
@@ -319,15 +448,248 @@
         // 月曆狀態
         let currentCalendarDate = new Date();
 
+        // GAS 後端程式碼模板
+        const GAS_CODE_TEMPLATE = `/**
+ * 專案名稱：運動儀表板通用讀取器 (Universal Reader)
+ * 用途：專門給 Web 前端讀取資料用，不負責接收 ESP32 寫入。
+ */
+
+// 定義欄位對應設定
+const COLUMN_CONFIG = {
+  // 跑步: "紀錄時間", "運動時間", " 距離(km)", " 消耗熱量(kcal)", " 平均速度(km/h)", " 備註"
+  running: {
+    date: "紀錄時間",
+    duration: "運動時間",
+    distance: " 距離(km)",
+    calories: " 消耗熱量(kcal)",
+    speed: " 平均速度(km/h)",
+    notes: " 備註"
+  },
+  // 腳踏車: " 日期時間", " 騎乘時長", " 總距離 (km)", " 消耗熱量 (kcal)", " 平均速度 (km/h)", " 備註"
+  cycling: {
+    date: " 日期時間",
+    duration: " 騎乘時長",
+    distance: " 總距離 (km)",
+    calories: " 消耗熱量 (kcal)",
+    speed: " 平均速度 (km/h)",
+    notes: " 備註"
+  }
+};
+
+/**
+ * 處理 GET 請求
+ */
+function doGet(e) {
+  return handleRequest(e);
+}
+
+/**
+ * 處理 POST 請求 (防止誤用)
+ */
+function doPost(e) {
+  return createJSONOutput({ 
+    status: 'error', 
+    message: '此 API 僅供網頁讀取資料 (Reader)，請勿使用於 ESP32 寫入。' 
+  });
+}
+
+/**
+ * 核心處理邏輯
+ */
+function handleRequest(e) {
+  const lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+
+  try {
+    const params = e.parameter;
+    const action = params.action;
+    
+    // 測試連線用
+    if (action === 'ping') {
+      return createJSONOutput({ status: 'success', message: 'Reader API 連線正常' });
+    }
+
+    // 讀取資料動作
+    if (action === 'read') {
+      const spreadsheetId = params.spreadsheetId;
+      const sheetName = params.sheetName;
+      const type = params.type; // 'running' or 'cycling'
+
+      if (!spreadsheetId || !sheetName || !type) {
+        throw new Error("缺少必要參數 (spreadsheetId, sheetName, type)");
+      }
+
+      const data = getSheetData(spreadsheetId, sheetName, type);
+      return createJSONOutput({ status: 'success', data: data });
+    }
+
+    return createJSONOutput({ status: 'error', message: '無效的 Action 指令' });
+
+  } catch (error) {
+    return createJSONOutput({ status: 'error', message: error.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 讀取並格式化試算表資料
+ */
+function getSheetData(id, name, type) {
+  let ss;
+  try {
+    ss = SpreadsheetApp.openById(id);
+  } catch (e) {
+    throw new Error(\`無法開啟試算表 (ID: \${id})。請確認 ID 正確且您有權限存取。\`);
+  }
+
+  const sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    throw new Error(\`在該試算表中找不到名稱為 "\${name}" 的工作表。請注意空白字元。\`);
+  }
+
+  const rows = sheet.getDataRange().getDisplayValues();
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  const values = rows.slice(1);
+  const config = COLUMN_CONFIG[type];
+
+  // 建立欄位索引對應表
+  const colMap = {};
+  for (const [key, userHeader] of Object.entries(config)) {
+    colMap[key] = headers.indexOf(userHeader.trim());
+  }
+
+  // 轉換資料
+  return values.map(row => {
+    return {
+      date: colMap.date > -1 ? row[colMap.date] : "",
+      duration: colMap.duration > -1 ? row[colMap.duration] : "",
+      distance: colMap.distance > -1 ? parseNumber(row[colMap.distance]) : 0,
+      calories: colMap.calories > -1 ? parseNumber(row[colMap.calories]) : 0,
+      speed: colMap.speed > -1 ? row[colMap.speed] : "",
+      notes: colMap.notes > -1 ? row[colMap.notes] : ""
+    };
+  }).filter(item => item.date !== "");
+}
+
+function parseNumber(str) {
+  if (!str) return 0;
+  const cleanStr = str.toString().replace(/[^\\d.-]/g, '');
+  const num = parseFloat(cleanStr);
+  return isNaN(num) ? 0 : num;
+}
+
+function createJSONOutput(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
+            // 1. 檢查網址是否有分享參數
+            checkUrlConfig();
+
+            // 2. 載入設定
             loadSettings();
+            
+            // 3. 填入 GAS 程式碼
+            document.getElementById('gasCodeSource').value = GAS_CODE_TEMPLATE;
+
             if (config.gasUrl) {
                 initDashboard(); 
             } else {
                 openSettings();
             }
         });
+
+        // === 分享功能邏輯 (New) ===
+        
+        function checkUrlConfig() {
+            // 格式: index.html#config=BASE64_STRING
+            if (window.location.hash.includes('config=')) {
+                try {
+                    const hash = window.location.hash.split('config=')[1];
+                    if (hash) {
+                        // 解碼: Base64 -> URI Component -> JSON String -> Object
+                        // 支援中文的解碼方式
+                        const jsonStr = decodeURIComponent(atob(hash).split('').map(function(c) {
+                            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                        }).join(''));
+                        
+                        const sharedConfig = JSON.parse(jsonStr);
+                        
+                        // 驗證必要欄位
+                        if (sharedConfig.gasUrl && sharedConfig.runId && sharedConfig.bikeId) {
+                            if (confirm('偵測到分享的設定連結，是否立即套用？\n\n這將會覆蓋您目前的設定。')) {
+                                localStorage.setItem(LS_KEY, JSON.stringify(sharedConfig));
+                                // 清除網址 hash 避免重複觸發
+                                window.history.replaceState(null, null, window.location.href.split('#')[0]);
+                                alert('設定已套用！正在載入數據...');
+                                window.location.reload();
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('無效的分享連結', e);
+                    alert('分享連結無效或已損壞。');
+                }
+            }
+        }
+
+        function openShare() {
+            if (!config.gasUrl) {
+                alert('請先完成設定才能使用分享功能。');
+                openSettings();
+                return;
+            }
+            
+            document.getElementById('shareModal').classList.remove('hidden');
+            
+            // 1. 編碼設定
+            // 支援中文的編碼方式: Object -> JSON String -> URI Component -> Base64
+            const jsonStr = JSON.stringify(config);
+            const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g,
+                function toSolidBytes(match, p1) {
+                    return String.fromCharCode('0x' + p1);
+            }));
+            
+            // 2. 產生連結
+            const baseUrl = window.location.href.split('#')[0].split('?')[0];
+            const shareUrl = `${baseUrl}#config=${encoded}`;
+            
+            document.getElementById('shareLinkInput').value = shareUrl;
+            
+            // 3. 產生 QR Code
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // 清空舊的
+            
+            new QRCode(qrContainer, {
+                text: shareUrl,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }
+
+        function closeShare() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function copyShareLink() {
+            const copyText = document.getElementById("shareLinkInput");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                alert("連結已複製到剪貼簿！");
+            } catch (err) {
+                console.error('複製失敗', err);
+            }
+        }
 
         // === 核心資料邏輯 ===
 
@@ -887,6 +1249,19 @@
         function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
         function openHelp() { document.getElementById('helpModal').classList.remove('hidden'); }
         function closeHelp() { document.getElementById('helpModal').classList.add('hidden'); }
+        
+        function copyGasCode() {
+            const copyText = document.getElementById("gasCodeSource");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                document.execCommand('copy');
+                alert("程式碼已複製！請前往 Google Apps Script 貼上。");
+            } catch (err) {
+                console.error('無法複製', err);
+            }
+        }
     </script>
 </body>
 </html>
