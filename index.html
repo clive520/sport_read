@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的全方位運動紀錄</title>
+    <!-- 解決 Favicon 404 錯誤 -->
+    <link rel="icon" href="data:,">
+    
     <!-- Tailwind CSS (樣式庫) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -224,7 +227,7 @@
         </div>
     </div>
 
-    <!-- 說明 Modal (保持簡化，邏輯同前) -->
+    <!-- 說明 Modal -->
     <div id="helpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="fixed inset-0 bg-gray-900 bg-opacity-80" onclick="closeHelp()"></div>
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative z-10">
@@ -358,7 +361,13 @@
             document.getElementById('dashBikeDist').innerText = bikeDist.toFixed(1) + " km";
 
             // 2. 渲染近期綜合列表 (前 10 筆)
-            const sortedData = allData.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+            // 這裡也使用安全的日期解析來排序
+            const sortedData = allData.sort((a, b) => {
+                const dateA = parseDateSafely(a.date) || new Date(0);
+                const dateB = parseDateSafely(b.date) || new Date(0);
+                return dateB - dateA; // 新到舊
+            }).slice(0, 10);
+
             const combinedTbody = document.getElementById('combinedTableBody');
             combinedTbody.innerHTML = '';
             
@@ -416,7 +425,28 @@
 
         // === 圖表與分析邏輯 ===
         
-        // 切換圖表時間粒度
+        // 安全的日期解析函式
+        function parseDateSafely(dateStr) {
+            if (!dateStr) return null;
+            // 1. 嘗試直接解析
+            let d = new Date(dateStr);
+            if (!isNaN(d.getTime())) return d;
+            
+            // 2. 嘗試正規化: 2023.10.27 或 2023-10-27 或 2023/10/27
+            // 同時移除中文 "年", "月" 換成 "/", "日" 移除
+            let cleanStr = dateStr.replace(/[-.]/g, '/').replace(/年|月/g, '/').replace(/日/g, ' ');
+            d = new Date(cleanStr);
+            if (!isNaN(d.getTime())) return d;
+            
+            // 3. 嘗試僅提取前段日期部分 (有些日期字串可能混雜文字)
+            const match = cleanStr.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+            if (match) {
+                return new Date(`${match[1]}/${match[2]}/${match[3]}`);
+            }
+            
+            return null; // 無法解析
+        }
+
         function updateChartPeriod(period) {
             // UI 按鈕狀態
             document.querySelectorAll('.period-btn').forEach(btn => {
@@ -428,48 +458,71 @@
             processChartData(period);
         }
 
-        // 處理圖表資料分組
         function processChartData(period) {
             const allData = [...dataCache.running, ...dataCache.cycling];
-            const grouped = {}; // Key: DateLabel, Value: { running: 0, cycling: 0 }
+            
+            // 使用 Map 來儲存分組資料，Key 為排序用的 ISO 字串 (YYYY-MM-DD)
+            // Value 為 { displayLabel: '...', running: 0, cycling: 0 }
+            const groupedMap = new Map();
 
             allData.forEach(item => {
-                const dateObj = new Date(item.date); // 假設格式可被解析 (YYYY/MM/DD 或 YYYY-MM-DD)
-                if (isNaN(dateObj)) return;
+                const dateObj = parseDateSafely(item.date);
+                if (!dateObj) return; // 跳過無效日期
 
-                let key = '';
-                // 定義分組 Key
+                let sortKey = '';
+                let displayLabel = '';
+                const y = dateObj.getFullYear();
+                const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                const d = dateObj.getDate().toString().padStart(2, '0');
+
                 if (period === 'day') {
-                    // 為了避免過多，只取最近 14 天資料，或者顯示格式為 MM/DD
-                    key = `${dateObj.getMonth()+1}/${dateObj.getDate()}`;
+                    // 日模式
+                    sortKey = `${y}-${m}-${d}`;
+                    displayLabel = `${m}/${d}`;
                 } else if (period === 'week') {
-                    // 簡單處理：顯示該週的週一日期
-                    const d = new Date(dateObj);
-                    const day = d.getDay() || 7;
-                    if (day !== 1) d.setHours(-24 * (day - 1));
-                    key = `${d.getMonth()+1}/${d.getDate()} 週`;
+                    // 週模式 (歸類到該週的週一)
+                    const day = dateObj.getDay() || 7; // Sunday is 0 -> 7
+                    const monday = new Date(dateObj);
+                    monday.setHours(0,0,0,0);
+                    monday.setDate(monday.getDate() - day + 1);
+                    
+                    const my = monday.getFullYear();
+                    const mm = (monday.getMonth() + 1).toString().padStart(2, '0');
+                    const md = monday.getDate().toString().padStart(2, '0');
+                    
+                    sortKey = `${my}-${mm}-${md}`;
+                    displayLabel = `${mm}/${md} 週`;
                 } else if (period === 'month') {
-                    key = `${dateObj.getFullYear()}-${(dateObj.getMonth()+1).toString().padStart(2,'0')}`;
+                    // 月模式
+                    sortKey = `${y}-${m}`;
+                    displayLabel = `${y}-${m}`;
                 } else if (period === 'year') {
-                    key = `${dateObj.getFullYear()}`;
+                    // 年模式
+                    sortKey = `${y}`;
+                    displayLabel = `${y}`;
                 }
 
-                // 初始化
-                if (!grouped[key]) grouped[key] = { running: 0, cycling: 0 };
+                if (!groupedMap.has(sortKey)) {
+                    groupedMap.set(sortKey, { displayLabel: displayLabel, running: 0, cycling: 0 });
+                }
                 
-                // 累加距離
+                const entry = groupedMap.get(sortKey);
                 const dist = parseFloat(item.distance) || 0;
-                if (item.type === 'running') grouped[key].running += dist;
-                else grouped[key].cycling += dist;
+                
+                if (item.type === 'running') entry.running += dist;
+                else entry.cycling += dist;
             });
 
-            // 排序 Key (日期)
-            // 注意：這裡的排序邏輯比較簡單，若是複雜日期格式可能需要更嚴謹的 Date 比較
-            const labels = Object.keys(grouped).sort(); 
-            // 如果是 Day 模式，且資料量過大，可能要截取最後幾筆，這裡暫時全部顯示
+            // 將 Map 轉為 Array 並根據 sortKey 排序
+            const sortedEntries = Array.from(groupedMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
             
-            const dataRun = labels.map(k => grouped[k].running);
-            const dataBike = labels.map(k => grouped[k].cycling);
+            // 取出最後 N 筆資料以免圖表過於擁擠 (例如日模式只顯示最近 30 天)
+            const displayLimit = period === 'day' ? 30 : (period === 'week' ? 24 : 100);
+            const finalData = sortedEntries.slice(-displayLimit);
+
+            const labels = finalData.map(e => e[1].displayLabel);
+            const dataRun = finalData.map(e => e[1].running);
+            const dataBike = finalData.map(e => e[1].cycling);
 
             drawChart(labels, dataRun, dataBike);
         }
@@ -489,7 +542,7 @@
                         {
                             label: '跑步 (km)',
                             data: dataRun,
-                            backgroundColor: 'rgba(59, 130, 246, 0.8)', // blue-500
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)', 
                             borderColor: 'rgba(59, 130, 246, 1)',
                             borderWidth: 1,
                             borderRadius: 4
@@ -497,7 +550,7 @@
                         {
                             label: '單車 (km)',
                             data: dataBike,
-                            backgroundColor: 'rgba(16, 185, 129, 0.8)', // emerald-500
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)', 
                             borderColor: 'rgba(16, 185, 129, 1)',
                             borderWidth: 1,
                             borderRadius: 4
