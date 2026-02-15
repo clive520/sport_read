@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <!-- Font Awesome (圖示) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js (圖表庫) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
@@ -20,19 +22,26 @@
         /* 隱藏滾動條但保持功能 */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Tab 動畫與樣式 */
+        .tab-btn.active { background-color: white; color: #2563eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .tab-btn { color: #4b5563; }
+        .tab-btn:hover:not(.active) { color: #111827; }
     </style>
 </head>
 <body class="text-gray-800">
 
     <!-- 導航列 -->
     <nav class="bg-white shadow-md fixed w-full z-10 top-0">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-person-running text-blue-600 text-2xl"></i>
-                    <h1 class="text-xl font-bold tracking-tight text-gray-900">運動儀表板</h1>
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <i class="fa-solid fa-heart-pulse text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold tracking-tight text-gray-900 hidden sm:block">運動儀表板</h1>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 sm:space-x-4">
                     <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="使用說明">
                         <i class="fa-solid fa-circle-info text-xl"></i>
                     </button>
@@ -45,88 +54,135 @@
     </nav>
 
     <!-- 主要內容區 -->
-    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10">
 
         <!-- 狀態與載入提示 -->
         <div id="statusMsg" class="hidden mb-4 p-4 rounded-md text-sm font-medium"></div>
 
-        <!-- 統計卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white card-shadow">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-blue-100 text-sm font-medium mb-1">總運動次數</p>
-                        <h3 class="text-3xl font-bold" id="totalCount">0</h3>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                        <i class="fa-solid fa-hashtag text-xl"></i>
+        <!-- 頁籤切換 (Tabs) -->
+        <div class="flex justify-center mb-6">
+            <div class="flex space-x-1 bg-gray-200 p-1 rounded-lg">
+                <button onclick="switchMainTab('dashboard')" id="nav-dashboard" class="tab-btn active px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
+                    <i class="fa-solid fa-chart-line mr-2"></i>綜合分析
+                </button>
+                <button onclick="switchMainTab('running')" id="nav-running" class="tab-btn px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
+                    <i class="fa-solid fa-person-running mr-2"></i>跑步明細
+                </button>
+                <button onclick="switchMainTab('cycling')" id="nav-cycling" class="tab-btn px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
+                    <i class="fa-solid fa-bicycle mr-2"></i>單車明細
+                </button>
+            </div>
+        </div>
+
+        <!-- 載入動畫 (全域) -->
+        <div id="globalLoader" class="hidden flex flex-col justify-center items-center py-20">
+            <div class="loading-spinner ease-linear rounded-full border-4 border-t-4 border-blue-500 h-10 w-10 mb-4"></div>
+            <span class="text-gray-500 font-medium">正在整合所有數據...</span>
+        </div>
+
+        <!-- ==================== 頁面 1: 綜合分析儀表板 (Dashboard) ==================== -->
+        <div id="view-dashboard" class="space-y-6 animate-fade-in">
+            
+            <!-- 統計卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-blue-500"></div>
+                    <p class="text-gray-500 text-sm font-medium mb-1">總累積距離</p>
+                    <h3 class="text-3xl font-bold text-gray-800"><span id="dashTotalDistance">0.0</span> <span class="text-lg text-gray-400 font-normal">km</span></h3>
+                    <div class="mt-2 text-xs text-gray-400 flex items-center">
+                        <span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span> 跑步 <span id="dashRunDist" class="mr-2 text-gray-600">0</span>
+                        <span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-1"></span> 單車 <span id="dashBikeDist" class="text-gray-600">0</span>
                     </div>
                 </div>
-            </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white card-shadow">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-emerald-100 text-sm font-medium mb-1">累積總距離</p>
-                        <h3 class="text-3xl font-bold"><span id="totalDistance">0.0</span> <span class="text-lg font-normal">km</span></h3>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                        <i class="fa-solid fa-route text-xl"></i>
-                    </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-orange-500"></div>
+                    <p class="text-gray-500 text-sm font-medium mb-1">總消耗熱量</p>
+                    <h3 class="text-3xl font-bold text-gray-800"><span id="dashTotalCalories">0</span> <span class="text-lg text-gray-400 font-normal">kcal</span></h3>
+                    <div class="mt-2 text-xs text-gray-400">燃燒脂肪的最佳證明</div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-purple-500"></div>
+                    <p class="text-gray-500 text-sm font-medium mb-1">總運動次數</p>
+                    <h3 class="text-3xl font-bold text-gray-800" id="dashTotalCount">0</h3>
+                    <div class="mt-2 text-xs text-gray-400">持續累積中</div>
                 </div>
             </div>
-            <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white card-shadow">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-orange-100 text-sm font-medium mb-1">總消耗熱量</p>
-                        <h3 class="text-3xl font-bold"><span id="totalCalories">0</span> <span class="text-lg font-normal">kcal</span></h3>
+
+            <!-- 圖表控制區 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                        <i class="fa-solid fa-chart-simple text-blue-500 mr-2"></i>運動趨勢分析
+                    </h2>
+                    <!-- 時間粒度切換 -->
+                    <div class="flex bg-gray-100 rounded-lg p-1 text-xs sm:text-sm">
+                        <button onclick="updateChartPeriod('day')" id="btn-period-day" class="period-btn px-3 py-1.5 rounded-md transition-all text-gray-600 hover:text-gray-900">日</button>
+                        <button onclick="updateChartPeriod('week')" id="btn-period-week" class="period-btn px-3 py-1.5 rounded-md transition-all text-gray-600 hover:text-gray-900">週</button>
+                        <button onclick="updateChartPeriod('month')" id="btn-period-month" class="period-btn px-3 py-1.5 rounded-md transition-all bg-white shadow-sm text-blue-600 font-bold">月</button>
+                        <button onclick="updateChartPeriod('year')" id="btn-period-year" class="period-btn px-3 py-1.5 rounded-md transition-all text-gray-600 hover:text-gray-900">年</button>
                     </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                        <i class="fa-solid fa-fire text-xl"></i>
-                    </div>
+                </div>
+                
+                <!-- Chart.js Canvas -->
+                <div class="relative h-72 w-full">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 綜合列表 (List View) -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-700">近期運動紀錄 (整合)</h3>
+                    <span class="text-xs text-gray-400">依日期排序</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">類型</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">距離 (km)</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">熱量 (kcal)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody id="combinedTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 綜合資料 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-3 border-t border-gray-100 bg-gray-50 text-center">
+                    <button onclick="switchMainTab('running')" class="text-xs text-blue-500 hover:underline">查看更多明細...</button>
                 </div>
             </div>
         </div>
 
-        <!-- 類型切換 Tabs -->
-        <div class="flex space-x-2 mb-6 bg-gray-200 p-1 rounded-lg w-fit">
-            <button onclick="switchTab('running')" id="tab-running" class="px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-blue-600">
-                <i class="fa-solid fa-person-running mr-2"></i>跑步紀錄
-            </button>
-            <button onclick="switchTab('cycling')" id="tab-cycling" class="px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900">
-                <i class="fa-solid fa-bicycle mr-2"></i>腳踏車紀錄
-            </button>
+        <!-- ==================== 頁面 2 & 3: 個別明細 (共用 Table 結構) ==================== -->
+        <div id="view-detail" class="hidden space-y-4">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center" id="detailHeader">
+                    <h3 class="font-bold text-gray-700">詳細紀錄</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期/時間</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持續時間</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">距離 (km)</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">熱量 (kcal)</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">均速 (km/h)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 個別資料 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <!-- 資料列表 -->
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期/時間</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持續時間</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">距離 (km)</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">熱量 (kcal)</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">均速 (km/h)</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備註</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
-                        <!-- 資料將由 JS 插入 -->
-                        <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-gray-500">
-                                請先點擊右上角「設定」按鈕，設定您的 GAS URL 與試算表 ID。
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <!-- 載入動畫 -->
-            <div id="loadingIndicator" class="hidden flex justify-center items-center py-10">
-                <div class="loading-spinner ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8"></div>
-                <span class="ml-3 text-gray-500 font-medium">資料讀取中...</span>
-            </div>
-        </div>
     </main>
 
     <!-- 設定 Modal -->
@@ -136,237 +192,216 @@
             <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
                 <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
                     <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                                <i class="fa-solid fa-gear text-blue-600"></i>
+                        <h3 class="text-lg font-semibold leading-6 text-gray-900 mb-4">系統設定</h3>
+                        <div class="space-y-4">
+                            <!-- GAS URL -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">GAS 部署網址</label>
+                                <input type="password" id="settingGasUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 sm:text-sm p-2 border">
                             </div>
-                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                                <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">系統設定</h3>
-                                <div class="mt-4 space-y-4">
-                                    <!-- GAS URL -->
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700">GAS 部署網址 (Web App URL)</label>
-                                        <input type="password" id="settingGasUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="https://script.google.com/macros/s/...">
-                                    </div>
-                                    <hr class="border-gray-200">
-                                    <!-- Running Settings -->
-                                    <div>
-                                        <label class="block text-sm font-medium text-blue-700"><i class="fa-solid fa-person-running mr-1"></i>跑步試算表 ID</label>
-                                        <input type="text" id="settingRunId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 sm:text-sm p-2 border" placeholder="輸入跑步紀錄的 Spreadsheet ID">
-                                        <label class="block text-xs text-gray-500 mt-1">工作表名稱 (預設: 運動紀錄 )</label>
-                                        <input type="text" id="settingRunSheetName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-xs p-2 border bg-gray-50" value="運動紀錄 ">
-                                    </div>
-                                    <!-- Cycling Settings -->
-                                    <div>
-                                        <label class="block text-sm font-medium text-emerald-700"><i class="fa-solid fa-bicycle mr-1"></i>腳踏車試算表 ID</label>
-                                        <input type="text" id="settingBikeId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 sm:text-sm p-2 border" placeholder="輸入腳踏車紀錄的 Spreadsheet ID">
-                                        <label class="block text-xs text-gray-500 mt-1">工作表名稱 (預設: 騎乘紀錄 )</label>
-                                        <input type="text" id="settingBikeSheetName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-xs p-2 border bg-gray-50" value="騎乘紀錄  ">
-                                    </div>
-                                    <!-- Gemini API (Optional) -->
-                                    <div>
-                                        <label class="block text-sm font-medium text-purple-700">Gemini API Key (選填)</label>
-                                        <input type="password" id="settingApiKey" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 sm:text-sm p-2 border" placeholder="若無可留空">
-                                    </div>
-                                </div>
+                            <!-- Running Settings -->
+                            <div class="bg-blue-50 p-3 rounded-md">
+                                <label class="block text-sm font-medium text-blue-700">跑步試算表 ID</label>
+                                <input type="text" id="settingRunId" class="mt-1 block w-full rounded-md border-gray-300 sm:text-sm p-2 border">
+                                <label class="block text-xs text-gray-500 mt-1">工作表名稱</label>
+                                <input type="text" id="settingRunSheetName" class="mt-1 block w-full rounded-md border-gray-300 text-xs p-2 border" value="運動紀錄 ">
+                            </div>
+                            <!-- Cycling Settings -->
+                            <div class="bg-emerald-50 p-3 rounded-md">
+                                <label class="block text-sm font-medium text-emerald-700">腳踏車試算表 ID</label>
+                                <input type="text" id="settingBikeId" class="mt-1 block w-full rounded-md border-gray-300 sm:text-sm p-2 border">
+                                <label class="block text-xs text-gray-500 mt-1">工作表名稱</label>
+                                <input type="text" id="settingBikeSheetName" class="mt-1 block w-full rounded-md border-gray-300 text-xs p-2 border" value="騎乘紀錄  ">
                             </div>
                         </div>
                     </div>
                     <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 justify-between">
-                        <div class="flex sm:flex-row-reverse gap-2">
-                            <button type="button" onclick="saveSettings()" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto">儲存並重整</button>
-                            <button type="button" onclick="closeSettings()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">取消</button>
-                        </div>
-                        <button type="button" onclick="resetSettings()" class="mt-3 sm:mt-0 inline-flex w-full justify-center rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 sm:w-auto border border-red-200">清除設定</button>
+                        <button type="button" onclick="saveSettings()" class="w-full sm:w-auto inline-flex justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 ml-3">儲存</button>
+                        <button type="button" onclick="closeSettings()" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">取消</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 說明 Modal -->
-    <div id="helpModal" class="fixed inset-0 z-50 hidden">
-        <div class="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm" onclick="closeHelp()"></div>
-        <div class="fixed inset-0 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <h2 class="text-2xl font-bold text-gray-800">GAS 部署與使用說明</h2>
-                    <button onclick="closeHelp()" class="text-gray-500 hover:text-gray-700">
-                        <i class="fa-solid fa-xmark text-2xl"></i>
-                    </button>
-                </div>
-                <div class="p-6 overflow-y-auto flex-1 text-sm text-gray-600 space-y-4">
-                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <h3 class="font-bold text-blue-800 mb-2">步驟 1: 建立 Google Apps Script</h3>
-                        <p>請前往 <a href="https://script.google.com/" target="_blank" class="text-blue-600 underline">script.google.com</a> 建立新專案，並將下方代碼完全覆蓋 `Code.gs`。</p>
-                    </div>
-                    
-                    <div class="relative group">
-                        <textarea id="gasCodeDisplay" class="w-full h-64 p-4 bg-gray-800 text-gray-100 rounded-lg font-mono text-xs" readonly></textarea>
-                        <button onclick="copyCode()" class="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs transition">
-                            <i class="fa-regular fa-copy mr-1"></i>複製代碼
-                        </button>
-                    </div>
-
-                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                        <h3 class="font-bold text-yellow-800 mb-2">步驟 2: 部署為網頁應用程式</h3>
-                        <ol class="list-decimal list-inside space-y-1 ml-2">
-                            <li>點擊右上角「部署」 > 「新增部署」。</li>
-                            <li>選取類型：「網頁應用程式」。</li>
-                            <li>執行身分：選取 <strong>「我 (Me)」</strong> (這樣才能讀取您的試算表)。</li>
-                            <li>誰可以存取：選取 <strong>「任何人 (Anyone)」</strong> (這樣前端 HTML 才能呼叫 API)。</li>
-                            <li>複製產生的網址 (URL)，並填入本系統的設定中。</li>
-                        </ol>
-                    </div>
-                </div>
+    <!-- 說明 Modal (保持簡化，邏輯同前) -->
+    <div id="helpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-80" onclick="closeHelp()"></div>
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative z-10">
+            <h2 class="text-xl font-bold mb-4">使用說明</h2>
+            <p class="text-sm text-gray-600 mb-4">本系統整合了您的「跑步」與「腳踏車」試算表。請確認您已正確部署 GAS 讀取專用腳本，並將 ID 填入設定中。</p>
+            <div class="flex justify-end">
+                <button onclick="closeHelp()" class="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">關閉</button>
             </div>
         </div>
     </div>
 
     <script>
-        // === 全域變數與初始化 ===
+        // === 全域變數 ===
         const LS_KEY = 'mySportTracker_config';
-        let currentMode = 'running'; // 'running' or 'cycling'
-        let config = {
-            gasUrl: '',
-            runId: '',
-            runSheet: '運動紀錄 ',
-            bikeId: '',
-            bikeSheet: '騎乘紀錄  ', // 注意使用者原始需求中的空格
-            apiKey: ''
+        let config = {};
+        
+        // 儲存原始資料 (Raw Data)
+        let dataCache = {
+            running: [],
+            cycling: []
         };
+        
+        // Chart 實例
+        let chartInstance = null;
 
-        // 頁面載入時執行
+        // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
-            
-            // 填入程式碼到說明視窗 (這裡僅為示範，實際部署時請將 Code.gs 內容貼入)
-            // 在實際生成的文件中，這裡我們會放入一個指引字串
-            document.getElementById('gasCodeDisplay').value = "// 請複製上方的 Code.gs 內容至此";
-
-            // 如果有設定，自動讀取
             if (config.gasUrl) {
-                fetchData();
+                initDashboard(); // 啟動並讀取所有資料
             } else {
-                openSettings(); // 第一次使用強制開啟設定
+                openSettings();
             }
         });
 
-        // === 設定管理 ===
-        function loadSettings() {
-            const saved = localStorage.getItem(LS_KEY);
-            if (saved) {
-                config = JSON.parse(saved);
-                // 填回 Input
-                document.getElementById('settingGasUrl').value = config.gasUrl || '';
-                document.getElementById('settingRunId').value = config.runId || '';
-                document.getElementById('settingRunSheetName').value = config.runSheet || '運動紀錄 ';
-                document.getElementById('settingBikeId').value = config.bikeId || '';
-                document.getElementById('settingBikeSheetName').value = config.bikeSheet || '騎乘紀錄  ';
-                document.getElementById('settingApiKey').value = config.apiKey || '';
-            }
-        }
+        // === 核心資料邏輯 ===
 
-        function saveSettings() {
-            config.gasUrl = document.getElementById('settingGasUrl').value.trim();
-            config.runId = document.getElementById('settingRunId').value.trim();
-            config.runSheet = document.getElementById('settingRunSheetName').value; // 保留空格
-            config.bikeId = document.getElementById('settingBikeId').value.trim();
-            config.bikeSheet = document.getElementById('settingBikeSheetName').value; // 保留空格
-            config.apiKey = document.getElementById('settingApiKey').value.trim();
-
-            if (!config.gasUrl) {
-                alert('請輸入 GAS URL');
-                return;
-            }
-
-            localStorage.setItem(LS_KEY, JSON.stringify(config));
-            closeSettings();
-            fetchData(); // 重新讀取
-        }
-
-        function resetSettings() {
-            if(confirm('確定要清除所有設定嗎？')) {
-                localStorage.removeItem(LS_KEY);
-                location.reload();
-            }
-        }
-
-        // === 資料讀取與顯示 ===
-        function switchTab(mode) {
-            currentMode = mode;
+        // 初始化並同時抓取兩邊資料
+        async function initDashboard() {
+            const loader = document.getElementById('globalLoader');
+            const dashboard = document.getElementById('view-dashboard');
             
-            // UI 切換
-            const btnRun = document.getElementById('tab-running');
-            const btnBike = document.getElementById('tab-cycling');
-            
-            if (mode === 'running') {
-                btnRun.className = "px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-blue-600";
-                btnBike.className = "px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900";
-            } else {
-                btnBike.className = "px-6 py-2 rounded-md text-sm font-medium transition-all shadow-sm bg-white text-emerald-600";
-                btnRun.className = "px-6 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-900";
-            }
-
-            fetchData();
-        }
-
-        async function fetchData() {
-            const loading = document.getElementById('loadingIndicator');
-            const tbody = document.getElementById('dataTableBody');
-            const statusDiv = document.getElementById('statusMsg');
-            
-            // 清空表格與狀態
-            tbody.innerHTML = '';
-            statusDiv.className = 'hidden';
-            loading.classList.remove('hidden');
-
-            // 準備參數
-            const targetId = currentMode === 'running' ? config.runId : config.bikeId;
-            const targetSheet = currentMode === 'running' ? config.runSheet : config.bikeSheet;
-
-            if (!config.gasUrl || !targetId) {
-                loading.classList.add('hidden');
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-red-500">缺少試算表 ID 或 GAS URL 設定。</td></tr>`;
-                return;
-            }
-
-            const url = `${config.gasUrl}?action=read&spreadsheetId=${targetId}&sheetName=${encodeURIComponent(targetSheet)}&type=${currentMode}`;
+            dashboard.classList.add('hidden');
+            loader.classList.remove('hidden');
 
             try {
-                const response = await fetch(url);
-                const json = await response.json();
+                // 平行運算：同時抓取跑步和單車資料
+                const [runData, bikeData] = await Promise.all([
+                    fetchRawData(config.runId, config.runSheet, 'running'),
+                    fetchRawData(config.bikeId, config.bikeSheet, 'cycling')
+                ]);
 
-                loading.classList.add('hidden');
+                dataCache.running = runData;
+                dataCache.cycling = bikeData;
 
-                if (json.status !== 'success') {
-                    throw new Error(json.message || '未知錯誤');
-                }
-
-                renderTable(json.data);
-                calculateStats(json.data);
-
+                // 預設顯示 Dashboard
+                renderDashboard();
+                
             } catch (error) {
-                loading.classList.add('hidden');
-                console.error(error);
-                statusDiv.innerText = `讀取失敗: ${error.message}`;
-                statusDiv.className = 'mb-4 p-4 rounded-md text-sm font-medium bg-red-100 text-red-700 block';
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">無法載入資料，請檢查設定與權限。</td></tr>`;
+                console.error("資料讀取失敗", error);
+                document.getElementById('statusMsg').innerText = "資料讀取失敗，請檢查網路或設定";
+                document.getElementById('statusMsg').classList.remove('hidden', 'bg-red-100', 'text-red-700');
+            } finally {
+                loader.classList.add('hidden');
+                dashboard.classList.remove('hidden');
             }
         }
 
-        function renderTable(data) {
-            const tbody = document.getElementById('dataTableBody');
+        // 單一 Fetch 封裝
+        async function fetchRawData(id, sheet, type) {
+            if (!id) return [];
+            const url = `${config.gasUrl}?action=read&spreadsheetId=${id}&sheetName=${encodeURIComponent(sheet)}&type=${type}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (json.status !== 'success') throw new Error(json.message);
+            // 加上 type 標記以便後續分辨
+            return json.data.map(item => ({ ...item, type: type }));
+        }
+
+        // === 畫面渲染 ===
+
+        function switchMainTab(tabName) {
+            // 切換按鈕樣式
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-white', 'text-blue-600', 'shadow-sm');
+                btn.classList.add('text-gray-600');
+            });
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            activeBtn.classList.add('active', 'bg-white', 'text-blue-600', 'shadow-sm');
+            activeBtn.classList.remove('text-gray-600');
+
+            // 切換視圖內容
+            const viewDash = document.getElementById('view-dashboard');
+            const viewDetail = document.getElementById('view-detail');
+
+            if (tabName === 'dashboard') {
+                viewDash.classList.remove('hidden');
+                viewDetail.classList.add('hidden');
+                // 確保圖表尺寸正確
+                if(chartInstance) chartInstance.resize();
+            } else {
+                viewDash.classList.add('hidden');
+                viewDetail.classList.remove('hidden');
+                renderDetailTable(tabName);
+            }
+        }
+
+        // 渲染 Dashboard 主畫面
+        function renderDashboard() {
+            const allData = [...dataCache.running, ...dataCache.cycling];
             
+            // 1. 計算總計數據 (Total Stats)
+            let totalDist = 0;
+            let totalCal = 0;
+            let runDist = 0;
+            let bikeDist = 0;
+
+            allData.forEach(d => {
+                const dist = parseFloat(d.distance) || 0;
+                const cal = parseFloat(d.calories) || 0;
+                totalDist += dist;
+                totalCal += cal;
+                if(d.type === 'running') runDist += dist;
+                if(d.type === 'cycling') bikeDist += dist;
+            });
+
+            animateValue("dashTotalDistance", 0, totalDist, 1000, true);
+            animateValue("dashTotalCalories", 0, totalCal, 1000);
+            animateValue("dashTotalCount", 0, allData.length, 1000);
+            document.getElementById('dashRunDist').innerText = runDist.toFixed(1) + " km";
+            document.getElementById('dashBikeDist').innerText = bikeDist.toFixed(1) + " km";
+
+            // 2. 渲染近期綜合列表 (前 10 筆)
+            const sortedData = allData.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+            const combinedTbody = document.getElementById('combinedTableBody');
+            combinedTbody.innerHTML = '';
+            
+            sortedData.forEach(row => {
+                const icon = row.type === 'running' 
+                    ? '<i class="fa-solid fa-person-running text-blue-500 text-lg"></i>' 
+                    : '<i class="fa-solid fa-bicycle text-emerald-500 text-lg"></i>';
+                
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-center w-16">${icon}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">${row.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-right font-mono">${parseFloat(row.distance).toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-right font-mono">${Math.round(row.calories)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-400 truncate max-w-xs">${row.notes}</td>
+                `;
+                combinedTbody.appendChild(tr);
+            });
+
+            // 3. 初始繪製圖表 (預設: 月)
+            updateChartPeriod('month');
+        }
+
+        // 渲染個別詳細列表
+        function renderDetailTable(type) {
+            const tbody = document.getElementById('detailTableBody');
+            const header = document.querySelector('#detailHeader h3');
+            const data = dataCache[type];
+            
+            // 設定標題顏色與文字
+            header.innerText = type === 'running' ? '跑步詳細紀錄' : '單車詳細紀錄';
+            header.className = type === 'running' ? 'font-bold text-blue-700' : 'font-bold text-emerald-700';
+
+            tbody.innerHTML = '';
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">目前尚無資料</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">尚無資料</td></tr>`;
                 return;
             }
 
-            // 反轉陣列，讓最新資料顯示在最上面
+            // 反轉顯示 (新到舊)
             [...data].reverse().forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition";
                 tr.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">${row.date}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${row.duration}</td>
@@ -379,22 +414,112 @@
             });
         }
 
-        function calculateStats(data) {
-            let totalDist = 0;
-            let totalCal = 0;
-
-            data.forEach(row => {
-                totalDist += parseFloat(row.distance) || 0;
-                totalCal += parseFloat(row.calories) || 0;
+        // === 圖表與分析邏輯 ===
+        
+        // 切換圖表時間粒度
+        function updateChartPeriod(period) {
+            // UI 按鈕狀態
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.className = 'period-btn px-3 py-1.5 rounded-md transition-all text-gray-600 hover:text-gray-900';
             });
+            const activeBtn = document.getElementById(`btn-period-${period}`);
+            activeBtn.className = 'period-btn px-3 py-1.5 rounded-md transition-all bg-white shadow-sm text-blue-600 font-bold';
 
-            // 動畫數字效果
-            animateValue("totalCount", 0, data.length, 1000);
-            animateValue("totalDistance", 0, totalDist.toFixed(1), 1000, true);
-            animateValue("totalCalories", 0, Math.floor(totalCal), 1000);
+            processChartData(period);
         }
 
-        // === 工具函數 ===
+        // 處理圖表資料分組
+        function processChartData(period) {
+            const allData = [...dataCache.running, ...dataCache.cycling];
+            const grouped = {}; // Key: DateLabel, Value: { running: 0, cycling: 0 }
+
+            allData.forEach(item => {
+                const dateObj = new Date(item.date); // 假設格式可被解析 (YYYY/MM/DD 或 YYYY-MM-DD)
+                if (isNaN(dateObj)) return;
+
+                let key = '';
+                // 定義分組 Key
+                if (period === 'day') {
+                    // 為了避免過多，只取最近 14 天資料，或者顯示格式為 MM/DD
+                    key = `${dateObj.getMonth()+1}/${dateObj.getDate()}`;
+                } else if (period === 'week') {
+                    // 簡單處理：顯示該週的週一日期
+                    const d = new Date(dateObj);
+                    const day = d.getDay() || 7;
+                    if (day !== 1) d.setHours(-24 * (day - 1));
+                    key = `${d.getMonth()+1}/${d.getDate()} 週`;
+                } else if (period === 'month') {
+                    key = `${dateObj.getFullYear()}-${(dateObj.getMonth()+1).toString().padStart(2,'0')}`;
+                } else if (period === 'year') {
+                    key = `${dateObj.getFullYear()}`;
+                }
+
+                // 初始化
+                if (!grouped[key]) grouped[key] = { running: 0, cycling: 0 };
+                
+                // 累加距離
+                const dist = parseFloat(item.distance) || 0;
+                if (item.type === 'running') grouped[key].running += dist;
+                else grouped[key].cycling += dist;
+            });
+
+            // 排序 Key (日期)
+            // 注意：這裡的排序邏輯比較簡單，若是複雜日期格式可能需要更嚴謹的 Date 比較
+            const labels = Object.keys(grouped).sort(); 
+            // 如果是 Day 模式，且資料量過大，可能要截取最後幾筆，這裡暫時全部顯示
+            
+            const dataRun = labels.map(k => grouped[k].running);
+            const dataBike = labels.map(k => grouped[k].cycling);
+
+            drawChart(labels, dataRun, dataBike);
+        }
+
+        function drawChart(labels, dataRun, dataBike) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '跑步 (km)',
+                            data: dataRun,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)', // blue-500
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '單車 (km)',
+                            data: dataBike,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)', // emerald-500
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { mode: 'index', intersect: false }
+                    }
+                }
+            });
+        }
+
+        // === 通用功能 (設定與動畫) ===
         function animateValue(id, start, end, duration, isFloat = false) {
             const obj = document.getElementById(id);
             if (!obj) return;
@@ -411,17 +536,34 @@
             window.requestAnimationFrame(step);
         }
 
+        function loadSettings() {
+            const saved = localStorage.getItem(LS_KEY);
+            if (saved) {
+                config = JSON.parse(saved);
+                document.getElementById('settingGasUrl').value = config.gasUrl || '';
+                document.getElementById('settingRunId').value = config.runId || '';
+                document.getElementById('settingRunSheetName').value = config.runSheet || '運動紀錄 ';
+                document.getElementById('settingBikeId').value = config.bikeId || '';
+                document.getElementById('settingBikeSheetName').value = config.bikeSheet || '騎乘紀錄  ';
+            }
+        }
+
+        function saveSettings() {
+            config.gasUrl = document.getElementById('settingGasUrl').value.trim();
+            config.runId = document.getElementById('settingRunId').value.trim();
+            config.runSheet = document.getElementById('settingRunSheetName').value;
+            config.bikeId = document.getElementById('settingBikeId').value.trim();
+            config.bikeSheet = document.getElementById('settingBikeSheetName').value;
+            
+            localStorage.setItem(LS_KEY, JSON.stringify(config));
+            closeSettings();
+            initDashboard(); // 重新讀取
+        }
+
         function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); }
         function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
         function openHelp() { document.getElementById('helpModal').classList.remove('hidden'); }
         function closeHelp() { document.getElementById('helpModal').classList.add('hidden'); }
-        
-        function copyCode() {
-            const code = document.getElementById('gasCodeDisplay');
-            code.select();
-            document.execCommand('copy');
-            alert('代碼已複製！');
-        }
     </script>
 </body>
 </html>
