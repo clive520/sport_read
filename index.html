@@ -53,12 +53,12 @@
                     <h1 class="text-xl font-bold tracking-tight text-gray-900 hidden sm:block">運動儀表板</h1>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-4">
-                    <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition flex items-center gap-2" title="使用說明">
-                        <i class="fa-solid fa-circle-info text-xl"></i> <span class="hidden sm:inline text-sm font-medium"></span>
+                    <button onclick="openHelp()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="使用說明與部署教學">
+                        <i class="fa-solid fa-circle-info text-xl"></i>
                     </button>
-                    <!-- 新增分享按鈕 -->
-                    <button onclick="openShare()" class="p-2 text-gray-500 hover:text-blue-600 transition flex items-center gap-2" title="分享設定">
-                        <i class="fa-solid fa-share-nodes text-xl"></i> <span class="hidden sm:inline text-sm font-medium"></span>
+                    <!-- 分享按鈕 -->
+                    <button onclick="openShare()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="分享設定連結">
+                        <i class="fa-solid fa-share-nodes text-xl"></i>
                     </button>
                     <button onclick="openSettings()" class="p-2 text-gray-500 hover:text-blue-600 transition" title="設定">
                         <i class="fa-solid fa-gear text-xl"></i>
@@ -77,14 +77,14 @@
         <!-- 頁籤切換 (Tabs) -->
         <div class="flex justify-center mb-6">
             <div class="flex space-x-1 bg-gray-200 p-1 rounded-lg">
-                <button onclick="switchMainTab('dashboard')" id="nav-dashboard" class="tab-btn active px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
-                    <i class="fa-solid fa-calendar-days mr-2"></i>綜合與月曆
+                <button onclick="switchMainTab('dashboard')" id="nav-dashboard" title="綜合與月曆" class="tab-btn active px-8 sm:px-12 py-3 rounded-md text-xl transition-all">
+                    <i class="fa-solid fa-calendar-days"></i>
                 </button>
-                <button onclick="switchMainTab('running')" id="nav-running" class="tab-btn px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
-                    <i class="fa-solid fa-person-running mr-2"></i>跑步明細
+                <button onclick="switchMainTab('running')" id="nav-running" title="跑步明細" class="tab-btn px-8 sm:px-12 py-3 rounded-md text-xl transition-all">
+                    <i class="fa-solid fa-person-running"></i>
                 </button>
-                <button onclick="switchMainTab('cycling')" id="nav-cycling" class="tab-btn px-4 sm:px-8 py-2 rounded-md text-sm font-medium transition-all">
-                    <i class="fa-solid fa-bicycle mr-2"></i>單車明細
+                <button onclick="switchMainTab('cycling')" id="nav-cycling" title="單車明細" class="tab-btn px-8 sm:px-12 py-3 rounded-md text-xl transition-all">
+                    <i class="fa-solid fa-bicycle"></i>
                 </button>
             </div>
         </div>
