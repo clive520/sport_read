@@ -157,7 +157,7 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                     <h2 class="text-lg font-bold text-gray-800 flex items-center">
-                        <i class="fa-solid fa-chart-simple text-blue-500 mr-2"></i>趨勢分析
+                        <i class="fa-solid fa-chart-mixed text-blue-500 mr-2"></i>趨勢分析 (距離 & 熱量)
                     </h2>
                     <!-- 時間粒度切換 -->
                     <div class="flex bg-gray-100 rounded-lg p-1 text-xs sm:text-sm">
@@ -296,7 +296,7 @@
         <div class="fixed inset-0 bg-gray-900 bg-opacity-80" onclick="closeHelp()"></div>
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative z-10">
             <h2 class="text-xl font-bold mb-4">使用說明</h2>
-            <p class="text-sm text-gray-600 mb-4">本系統整合了您的「跑步」與「腳踏車」試算表。月曆功能點選日期可查看當日明細。明細頁面包含距離與熱量分析圖表（已支援每日加總）。</p>
+            <p class="text-sm text-gray-600 mb-4">本系統整合了您的「跑步」與「腳踏車」試算表。月曆功能點選日期可查看當日明細。綜合趨勢圖現已同時顯示距離(長條)與熱量(折線)。</p>
             <div class="flex justify-end">
                 <button onclick="closeHelp()" class="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">關閉</button>
             </div>
@@ -421,7 +421,7 @@
             updateChartPeriod('month');
         }
 
-        // === 月曆功能 (New) ===
+        // === 月曆功能 ===
 
         function changeMonth(delta) {
             currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
@@ -474,7 +474,6 @@
                 const bgClass = items.length > 0 ? "bg-white hover:bg-blue-50" : "bg-white text-gray-400";
                 
                 // 修正日期的資料屬性
-                // 這裡必須正規化日期格式以供點擊使用 (YYYY/MM/DD)
                 const dateStrForClick = `${year}/${(month+1).toString().padStart(2,'0')}/${day.toString().padStart(2,'0')}`;
 
                 const cell = document.createElement('div');
@@ -543,12 +542,12 @@
             document.getElementById('dayDetailModal').classList.add('hidden');
         }
 
-        // === 明細圖表邏輯 (Updated: Aggregate by Day) ===
+        // === 明細圖表邏輯 ===
         
         function renderDetailChart(type) {
             const ctx = document.getElementById('detailChart').getContext('2d');
             const title = document.getElementById('detailChartTitle');
-            const rawData = [...dataCache[type]]; // Use Raw Data
+            const rawData = [...dataCache[type]]; 
             
             // UI 更新
             if (type === 'running') {
@@ -557,23 +556,22 @@
                 title.innerHTML = '<i class="fa-solid fa-bicycle text-emerald-500 mr-2"></i>單車 - 距離與熱量趨勢 (每日總計)';
             }
 
-            // 1. 資料聚合 (Aggregation)：將同一天的資料加總
+            // 1. 資料聚合
             const aggregatedMap = new Map();
 
             rawData.forEach(item => {
                 const dateObj = parseDateSafely(item.date);
                 if (!dateObj) return;
 
-                // 產生標準化日期 Key (YYYY/MM/DD) 以便分組
                 const y = dateObj.getFullYear();
                 const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
                 const d = dateObj.getDate().toString().padStart(2, '0');
                 const key = `${y}/${m}/${d}`;
-                const label = `${m}/${d}`; // 圖表顯示用的標籤
+                const label = `${m}/${d}`;
 
                 if (!aggregatedMap.has(key)) {
                     aggregatedMap.set(key, { 
-                        dateObj: dateObj, // 用於排序
+                        dateObj: dateObj, 
                         label: label,
                         distance: 0, 
                         calories: 0 
@@ -585,10 +583,10 @@
                 entry.calories += parseFloat(item.calories) || 0;
             });
 
-            // 2. 轉為陣列並排序 (由舊到新)
+            // 2. 轉為陣列並排序
             const sortedData = Array.from(aggregatedMap.values()).sort((a, b) => a.dateObj - b.dateObj);
 
-            // 3. 取最近 30 "天" 的資料 (原本是最近 30 "筆")
+            // 3. 取最近 30 天
             const chartData = sortedData.slice(-30);
             
             const labels = chartData.map(d => d.label);
@@ -659,7 +657,6 @@
             const data = dataCache[type];
             
             header.innerText = type === 'running' ? '詳細紀錄列表' : '詳細紀錄列表';
-            //header.className = type === 'running' ? 'font-bold text-blue-700' : 'font-bold text-emerald-700';
 
             tbody.innerHTML = '';
             if (data.length === 0) {
@@ -746,14 +743,22 @@
                 }
 
                 if (!groupedMap.has(sortKey)) {
-                    groupedMap.set(sortKey, { displayLabel: displayLabel, running: 0, cycling: 0 });
+                    groupedMap.set(sortKey, { 
+                        displayLabel: displayLabel, 
+                        running: 0, 
+                        cycling: 0, 
+                        calories: 0 // 新增熱量欄位
+                    });
                 }
                 
                 const entry = groupedMap.get(sortKey);
                 const dist = parseFloat(item.distance) || 0;
+                const cal = parseFloat(item.calories) || 0; // 讀取熱量
                 
                 if (item.type === 'running') entry.running += dist;
                 else entry.cycling += dist;
+                
+                entry.calories += cal; // 累加熱量
             });
 
             const sortedEntries = Array.from(groupedMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -763,11 +768,12 @@
             const labels = finalData.map(e => e[1].displayLabel);
             const dataRun = finalData.map(e => e[1].running);
             const dataBike = finalData.map(e => e[1].cycling);
+            const dataCal = finalData.map(e => e[1].calories); // 取得熱量資料
 
-            drawChart(labels, dataRun, dataBike);
+            drawChart(labels, dataRun, dataBike, dataCal);
         }
 
-        function drawChart(labels, dataRun, dataBike) {
+        function drawChart(labels, dataRun, dataBike, dataCal) {
             const ctx = document.getElementById('mainChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
 
@@ -782,7 +788,9 @@
                             backgroundColor: 'rgba(59, 130, 246, 0.8)', 
                             borderColor: 'rgba(59, 130, 246, 1)',
                             borderWidth: 1,
-                            borderRadius: 4
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                            order: 1
                         },
                         {
                             label: '單車 (km)',
@@ -790,7 +798,22 @@
                             backgroundColor: 'rgba(16, 185, 129, 0.8)', 
                             borderColor: 'rgba(16, 185, 129, 1)',
                             borderWidth: 1,
-                            borderRadius: 4
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                            order: 1
+                        },
+                        // 新增熱量折線圖
+                        {
+                            label: '總熱量 (kcal)',
+                            data: dataCal,
+                            type: 'line',
+                            borderColor: 'rgba(249, 115, 22, 1)', // 橘色
+                            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            yAxisID: 'y1', // 指定右側 Y 軸
+                            order: 0 // 顯示在最上層
                         }
                     ]
                 },
@@ -799,7 +822,21 @@
                     maintainAspectRatio: false,
                     scales: {
                         x: { stacked: true, grid: { display: false } },
-                        y: { stacked: true, beginAtZero: true }
+                        y: { 
+                            stacked: true, 
+                            beginAtZero: true,
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: '距離 (km)' }
+                        },
+                        // 新增右側 Y 軸
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false }, // 右軸不顯示格線，保持畫面乾淨
+                            title: { display: true, text: '熱量 (kcal)' }
+                        }
                     },
                     plugins: {
                         legend: { position: 'bottom' },
