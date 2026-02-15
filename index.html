@@ -221,7 +221,7 @@
 
     </main>
 
-    <!-- 日詳細資料 Modal -->
+    <!-- 日詳細資料 Modal (更新版) -->
     <div id="dayDetailModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm" onclick="closeDayDetail()"></div>
         <div class="fixed inset-0 z-10 overflow-y-auto pointer-events-none">
@@ -242,6 +242,11 @@
                                 <span class="text-xs text-gray-500">總熱量</span>
                                 <div class="text-xl font-bold text-gray-800"><span id="dayTotalCal">0</span> <span class="text-xs font-normal">kcal</span></div>
                             </div>
+                        </div>
+
+                        <!-- 當日圖表 (New!) -->
+                        <div class="relative h-48 w-full mb-4">
+                            <canvas id="dayDetailChart"></canvas>
                         </div>
                         
                         <!-- 當日列表 -->
@@ -444,6 +449,7 @@
         
         let chartInstance = null; // 綜合圖表
         let detailChartInstance = null; // 明細頁圖表
+        let dayChartInstance = null; // 單日分析圖表
         
         // 月曆狀態
         let currentCalendarDate = new Date();
@@ -780,7 +786,7 @@ function createJSONOutput(data) {
             document.getElementById('dashRunDist').innerText = runDist.toFixed(1) + " km";
             document.getElementById('dashBikeDist').innerText = bikeDist.toFixed(1) + " km";
 
-            updateChartPeriod('month');
+            updateChartPeriod('day');
         }
 
         // === 月曆功能 ===
@@ -852,7 +858,7 @@ function createJSONOutput(data) {
             }
         }
 
-        // 開啟單日詳細 Modal
+        // 開啟單日詳細 Modal (Updated with Chart)
         function openDayDetail(dateStr, items) {
             const modal = document.getElementById('dayDetailModal');
             const title = document.getElementById('dayDetailTitle');
@@ -865,11 +871,28 @@ function createJSONOutput(data) {
             
             let totalDist = 0;
             let totalCal = 0;
+            
+            // 準備圖表數據
+            const chartLabels = [];
+            const chartDist = [];
+            const chartCal = [];
+            const barColors = [];
 
-            items.forEach(item => {
-                totalDist += parseFloat(item.distance) || 0;
-                totalCal += parseFloat(item.calories) || 0;
+            // 這裡假設 items 已經是當天所有紀錄，但順序可能需要處理 (目前是原順序)
+            // 為了顯示方便，我們使用 Index 當標籤，或者如果有時間欄位更好
+            items.forEach((item, index) => {
+                const dist = parseFloat(item.distance) || 0;
+                const cal = parseFloat(item.calories) || 0;
+                totalDist += dist;
+                totalCal += cal;
                 
+                const typeName = item.type === 'running' ? '跑步' : '單車';
+                chartLabels.push(`#${index + 1} ${typeName}`); // e.g., "#1 跑步"
+                chartDist.push(dist);
+                chartCal.push(cal);
+                
+                barColors.push(item.type === 'running' ? 'rgba(59, 130, 246, 0.7)' : 'rgba(16, 185, 129, 0.7)');
+
                 const typeInfo = item.type === 'running' 
                     ? { icon: 'fa-person-running', color: 'text-blue-600', bg: 'bg-blue-100', name: '跑步' }
                     : { icon: 'fa-bicycle', color: 'text-emerald-600', bg: 'bg-emerald-100', name: '單車' };
@@ -882,7 +905,7 @@ function createJSONOutput(data) {
                     </div>
                     <div class="flex-1">
                         <div class="flex justify-between items-baseline">
-                            <span class="font-bold text-gray-800">${typeInfo.name}</span>
+                            <span class="font-bold text-gray-800">#${index + 1} ${typeInfo.name}</span>
                             <span class="text-xs text-gray-500">${item.date}</span>
                         </div>
                         <div class="mt-1 text-sm text-gray-600">
@@ -898,6 +921,69 @@ function createJSONOutput(data) {
             dCal.innerText = Math.round(totalCal);
 
             modal.classList.remove('hidden');
+            
+            // 繪製/更新圖表
+            renderDayChart(chartLabels, chartDist, chartCal, barColors);
+        }
+        
+        function renderDayChart(labels, distData, calData, colors) {
+            const ctx = document.getElementById('dayDetailChart').getContext('2d');
+            
+            if (dayChartInstance) {
+                dayChartInstance.destroy();
+            }
+            
+            dayChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '距離 (km)',
+                            data: distData,
+                            backgroundColor: colors,
+                            borderWidth: 0,
+                            yAxisID: 'y',
+                            order: 2
+                        },
+                        {
+                            label: '熱量 (kcal)',
+                            data: calData,
+                            type: 'line',
+                            borderColor: 'rgba(249, 115, 22, 1)', // 橘色
+                            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 4,
+                            yAxisID: 'y1',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'bottom' }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: { display: true, text: '距離' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '熱量' }
+                        }
+                    }
+                }
+            });
         }
 
         function closeDayDetail() {
